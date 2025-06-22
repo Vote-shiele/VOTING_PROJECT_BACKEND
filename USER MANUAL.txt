@@ -1,0 +1,89 @@
+VOTING SYSTEM - USER MANUAL
+
+================================
+1. SYSTEM OVERVIEW
+================================
+- Secure online voting platform
+- Admin panel to create/manage polls
+- Voter portal to cast votes
+- Real-time results tracking
+
+================================
+2. ADMIN FEATURES
+================================
+
+A. ACCOUNT MANAGEMENT
+- Sign up at: /signup
+- Login at: /login
+
+B. POLL MANAGEMENT
+1. Create poll
+2. Add candidates
+3. Configure settings
+4. Launch poll
+
+* Public polls: Share via link/QR code
+* Private polls: Email invites only
+
+C. DASHBOARD TOOLS
+- Search polls by name/date
+- Filter by:
+  * Ongoing (active)
+  * Completed (archived)
+
+================================
+3. VOTER FEATURES
+================================
+1. Get poll link/email
+2. Login with provided credentials
+3. Select candidate(s)
+4. Submit vote (can't be changed)
+
+Security features:
+- Encrypted votes
+- One-time voting
+- Anonymous option
+
+================================
+4. INSTALLATION
+================================
+
+REQUIREMENTS:
+- Python 3.8+
+- Database (PostgreSQL/MySQL/SQLite)
+- Redis (optional for notifications)
+
+SETUP STEPS:
+1. git clone [your-repo-url]
+2. cd voting-system
+3. pip install -r requirements.txt
+4. cp .env.example .env
+5. Edit .env file
+6. python manage.py migrate
+7. python manage.py createsuperuser
+
+RUNNING:
+- Development: python manage.py runserver
+-Debugging : python manage.py runserver_plus --cert-file certs/cert.pem --key-file certs/key.pem
+
+- Production: gunicorn voting_site.wsgi:application
+
+================================
+5. TROUBLESHOOTING
+================================
+
+SSL ERRORS:
+- Disable SECURE_SSL_REDIRECT in dev
+
+EMAIL ISSUES:
+- Check SMTP settings in .env
+
+QR CODE PROBLEMS:
+- Reinstall Pillow package
+
+LOGIN LOOPS:
+- Clear browser cookies
+
+Support contact: admin@yourvotingapp.com
+
+NOTE: Always backup your database before updates.

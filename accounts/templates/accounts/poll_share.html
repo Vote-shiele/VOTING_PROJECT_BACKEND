@@ -1,0 +1,36 @@
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Share Poll: {{ poll.name }}</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Poll Link</h5>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control" value="{{ poll_url }}" id="pollUrl" readonly>
+            <button class="btn btn-outline-secondary" onclick="copyToClipboard()">Copy</button>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body text-center">
+        <h5 class="card-title">QR Code</h5>
+        <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+        <p class="mt-2">Scan to share</p>
+    </div>
+</div>
+
+<a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mt-3">Back to Dashboard</a>
+
+<script>
+function copyToClipboard() {
+    const copyText = document.getElementById("pollUrl");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    document.execCommand("copy");
+}
+</script>
+{% endblock %}

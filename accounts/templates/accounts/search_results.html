@@ -1,0 +1,84 @@
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Search Results</h2>
+        <div>
+            <span class="badge bg-info text-dark">
+                Found {{ ongoing_polls.count|add:completed_polls.count }} polls
+            </span>
+        </div>
+    </div>
+
+    {% if request.GET.q or request.GET.start_date or request.GET.end_date %}
+    <div class="alert alert-info mb-4">
+        <strong>Search Criteria:</strong>
+        {% if request.GET.q %} 
+            <span class="badge bg-primary">Keyword: "{{ request.GET.q }}"</span>
+        {% endif %}
+        {% if request.GET.start_date %} 
+            <span class="badge bg-secondary">From: {{ request.GET.start_date }}</span>
+        {% endif %}
+        {% if request.GET.end_date %} 
+            <span class="badge bg-secondary">To: {{ request.GET.end_date }}</span>
+        {% endif %}
+        <a href="{% url 'search_polls' %}" class="btn btn-sm btn-outline-danger ms-2">Clear filters</a>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5>Ongoing Polls ({{ ongoing_polls.count }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if ongoing_polls %}
+                    <div class="list-group">
+                        {% for poll in ongoing_polls %}
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ poll.name }}</h6>
+                                <small>{{ poll.start_date|date:"M d, Y" }}</small>
+                            </div>
+                            <p class="mb-1">{{ poll.description|truncatechars:100 }}</p>
+                            <small class="text-muted">Ends: {{ poll.end_date|date:"M d, Y H:i" }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">No ongoing polls match your criteria</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5>Completed Polls ({{ completed_polls.count }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if completed_polls %}
+                    <div class="list-group">
+                        {% for poll in completed_polls %}
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ poll.name }}</h6>
+                                <small>{{ poll.start_date|date:"M d, Y" }}</small>
+                            </div>
+                            <p class="mb-1">{{ poll.description|truncatechars:100 }}</p>
+                            <small class="text-muted">Ended: {{ poll.end_date|date:"M d, Y H:i" }}</small>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">No completed polls match your criteria</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

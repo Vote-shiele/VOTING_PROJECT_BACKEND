@@ -1,0 +1,8 @@
+<h2>Admin Login</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Log In</button>
+    <a href="{% url 'admin_signup' %}">sign up</a>
+
+</form>

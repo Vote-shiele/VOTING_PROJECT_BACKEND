@@ -1,0 +1,17 @@
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Invite Voters: {{ poll.name }}</h1>
+</div>
+
+<form method="post" action="{% url 'send_invitations' poll.id %}">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label for="emails" class="form-label">Enter email addresses (comma separated)</label>
+        <textarea class="form-control" id="emails" name="emails" rows="5"></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Send Invitations</button>
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+</form>
+{% endblock %}

@@ -8,6 +8,23 @@ class Admin(models.Model):
     def __str__(self):
         return self.username
 
+
+class AdminLog(models.Model):
+    ACTION_CHOICES = [
+        ('EDIT_CANDIDATE', 'Edit Candidate'),
+        ('DELETE_POLL', 'Delete Poll'),
+        ('EDIT_POLL', 'Edit Poll'),
+    ]
+
+    admin = models.ForeignKey(Admin, on_delete=models.CASCADE)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    details = models.TextField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField()
+
+    def __str__(self):
+        return f"{self.admin.username} {self.get_action_display()} at {self.timestamp}"
+
 from django.utils import timezone
 
 class Poll(models.Model):
@@ -31,6 +48,12 @@ class Candidate(models.Model):
     image = models.ImageField(upload_to='candidates/', blank=True, null=True)
     description = models.TextField(blank=True)
 
+    def get_edit_history(self):
+        return AdminLog.objects.filter(
+            action='EDIT_CANDIDATE',
+            details__contains=f"candidate_id={self.id}"
+        ).order_by('-timestamp')
+
     def __str__(self):
         return f"{self.name} ({self.poll.name})"
 
@@ -43,3 +66,16 @@ class Voter(models.Model):
 
     def __str__(self):
         return f"{self.username} ({self.poll.name})"
+
+
+
+class VoteLog(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
+    voter = models.ForeignKey(Voter, on_delete=models.CASCADE, null=True, blank=True)
+    candidate = models.ForeignKey(Candidate, on_delete=models.CASCADE)
+    voted_at = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    def __str__(self):
+        voter_name = self.voter.username if self.voter else "Anonymous"
+        return f"{voter_name} voted for {self.candidate.name} at {self.voted_at}"

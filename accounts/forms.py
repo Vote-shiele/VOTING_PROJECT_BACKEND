@@ -1,6 +1,10 @@
 from django import forms
 from .models import Admin
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password
+from .models import Voter
+from .models import Poll, Candidate
+
 
 class AdminSignUpForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput)
@@ -18,10 +22,6 @@ class AdminSignUpForm(forms.ModelForm):
 class AdminLoginForm(forms.Form):
     username = forms.CharField()
     password = forms.CharField(widget=forms.PasswordInput)
-
-from .models import Poll, Candidate
-
-
 class PollForm(forms.ModelForm):
     class Meta:
         model = Poll
@@ -42,16 +42,10 @@ class PollForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['poll_type'].widget.attrs.update({'class': 'form-check-input'})
-
-
 class CandidateForm(forms.ModelForm):
     class Meta:
         model = Candidate
         fields = ['name', 'image', 'description']
-
-from django.contrib.auth.hashers import make_password
-from .models import Voter
-
 class VoterForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput)
 
@@ -65,3 +59,28 @@ class VoterForm(forms.ModelForm):
         if commit:
             voter.save()
         return voter
+class PollEditForm(forms.ModelForm):
+    class Meta:
+        model = Poll
+        fields = ['name', 'description', 'end_date', 'poll_type']
+        widgets = {
+            'end_date': forms.DateTimeInput(attrs={
+                'class': 'form-control',
+                'type': 'datetime-local'
+            }),
+        }
+class PasswordVerificationForm(forms.Form):
+    password = forms.CharField(widget=forms.PasswordInput)
+class CandidateEditForm(forms.ModelForm):
+    class Meta:
+        model = Candidate
+        fields = ['name', 'image', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+        }
+class PollDeleteForm(forms.Form):
+    confirm = forms.BooleanField(
+        required=True,
+        label="I confirm I want to delete this poll and all its data"
+    )
+    password = forms.CharField(widget=forms.PasswordInput)

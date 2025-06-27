@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
-from .forms import AdminSignUpForm, AdminLoginForm
-from .models import Admin
+from .forms import AdminSignUpForm, AdminLoginForm, PollEditForm, PasswordVerificationForm, CandidateEditForm, \
+    PollDeleteForm
+from .models import Admin, AdminLog
 from django.contrib.auth.hashers import check_password
 from django.utils import timezone
 from django.http import HttpResponse
@@ -11,6 +12,13 @@ from datetime import datetime
 import qrcode
 import io
 import base64
+from django.contrib import messages
+from django.utils.timezone import now
+from .models import VoteLog
+from .forms import VoterForm
+from .models import Poll, Candidate
+from .forms import PollForm, CandidateForm
+from django.shortcuts import get_object_or_404
 
 def signup_view(request):
     if request.method == 'POST':
@@ -21,7 +29,6 @@ def signup_view(request):
     else:
         form = AdminSignUpForm()
     return render(request, 'accounts/signup.html', {'form': form})
-
 def login_view(request):
     if request.method == 'POST':
         form = AdminLoginForm(request.POST)
@@ -40,11 +47,6 @@ def login_view(request):
     else:
         form = AdminLoginForm()
     return render(request, 'accounts/login.html', {'form': form})
-
-from .models import Poll, Candidate
-from .forms import PollForm, CandidateForm
-from django.shortcuts import get_object_or_404
-
 def admin_dashboard(request):
     admin_id = request.session.get('admin_id')
     if not admin_id:
@@ -53,7 +55,6 @@ def admin_dashboard(request):
     admin = get_object_or_404(Admin, id=admin_id)
     polls = Poll.objects.filter(admin=admin)
     return render(request, 'accounts/dashboard.html', {'admin': admin, 'polls': polls})
-
 def create_poll(request):
     admin_id = request.session.get('admin_id')
     if not admin_id:
@@ -65,13 +66,27 @@ def create_poll(request):
             poll = form.save(commit=False)
             poll.admin_id = admin_id
             poll.save()
+
+            # Handle candidate creation if data is present
+            candidate_names = request.POST.getlist('candidate_name')
+            candidate_descriptions = request.POST.getlist('candidate_description')
+
+            for name, description in zip(candidate_names, candidate_descriptions):
+                if name:  # Only create if name is not empty
+                    Candidate.objects.create(
+                        poll=poll,
+                        name=name,
+                        description=description
+                    )
+
             return redirect('poll_created', poll_id=poll.id)
     else:
         form = PollForm()
 
-    return render(request, 'accounts/create_poll.html', {'form': form})
-
-
+    return render(request, 'accounts/create_poll.html', {
+        'form': form,
+        'candidate_form': CandidateForm(),  # For the template
+    })  #updated_Jun27_25
 def add_candidate(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
     if request.method == 'POST':
@@ -85,9 +100,6 @@ def add_candidate(request, poll_id):
         form = CandidateForm()
 
     return render(request, 'accounts/add_candidate.html', {'form': form, 'poll': poll})
-
-from .forms import VoterForm
-
 def add_voter(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
 
@@ -106,11 +118,6 @@ def add_voter(request, poll_id):
         form = VoterForm()
 
     return render(request, 'accounts/add_voter.html', {'form': form, 'poll': poll})
-
-
-
-
-
 def admin_dashboard(request):
     admin_id = request.session.get('admin_id')
     if not admin_id:
@@ -128,8 +135,6 @@ def admin_dashboard(request):
         'ongoing_polls': ongoing_polls,
         'completed_polls': completed_polls
     })
-
-
 def settings_view(request):
     admin_id = request.session.get('admin_id')
     if not admin_id:
@@ -138,8 +143,6 @@ def settings_view(request):
     admin = get_object_or_404(Admin, id=admin_id)
 
     return render(request, 'accounts/settings.html', {'admin': admin})
-
-
 # poll sharing functionality
 def poll_created_view(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
@@ -165,8 +168,6 @@ def poll_created_view(request, poll_id):
     else:
         # Private poll - show email invitation form
         return render(request, 'accounts/poll_invite.html', {'poll': poll})
-
-
 def send_invitations(request, poll_id):
     if request.method == 'POST':
         emails = request.POST.get('emails', '').split(',')
@@ -185,11 +186,6 @@ def send_invitations(request, poll_id):
         return redirect('admin_dashboard')
 
     return redirect('poll_created', poll_id=poll_id)
-
-
-
-
-
 def search_polls(request):
     admin_id = request.session.get('admin_id')
     if not admin_id:
@@ -233,4 +229,118 @@ def search_polls(request):
         'ongoing_polls': ongoing_polls,
         'completed_polls': completed_polls,
         'active_tab': 'search'
+    })
+def poll_details(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    candidates = Candidate.objects.filter(poll=poll)
+    qr_code = get_qr_code(request.build_absolute_uri(f'/poll-details/{poll.id}/'))
+    return render(request, 'accounts/poll_details.html', {
+        'poll': poll,
+        'candidates': candidates,
+        'qr_code': qr_code,
+        'now': timezone.now()
+    }) #updated_Jun27_25
+def edit_poll(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+
+    if request.method == 'POST':
+        form = PollEditForm(request.POST, instance=poll)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Poll updated successfully!')
+            return redirect('poll_details', poll_id=poll.id)
+    else:
+        form = PollEditForm(instance=poll)
+
+    return render(request, 'accounts/edit_poll.html', {
+        'form': form,
+        'poll': poll,
+    })
+def vote_log(request, poll_id):
+    if not request.session.get('admin_id'):
+        return redirect('admin_login')
+
+    poll = get_object_or_404(Poll, id=poll_id)
+    votes = VoteLog.objects.filter(poll=poll).order_by('-voted_at')
+
+    return render(request, 'accounts/vote_log.html', {
+        'poll': poll,
+        'votes': votes,
+    })
+
+#updated_Jun27_25
+def get_qr_code(url):
+    qr = qrcode.QRCode(version=1, box_size=10, border=5)
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill='black', back_color='white')
+    buffered = io.BytesIO()
+    img.save(buffered)
+    return base64.b64encode(buffered.getvalue()).decode()
+def edit_candidate(request, candidate_id):
+    if not request.session.get('admin_id'):
+        return redirect('admin_login')
+
+    candidate = get_object_or_404(Candidate, id=candidate_id)
+    admin = get_object_or_404(Admin, id=request.session['admin_id'])
+
+    if request.method == 'POST':
+        password_form = PasswordVerificationForm(request.POST)
+        candidate_form = CandidateEditForm(request.POST, request.FILES, instance=candidate)
+
+        if password_form.is_valid() and candidate_form.is_valid():
+            if check_password(password_form.cleaned_data['password'], admin.password):
+                candidate = candidate_form.save()
+
+                # Log the action
+                AdminLog.objects.create(
+                    admin=admin,
+                    action='EDIT_CANDIDATE',
+                    details=f"Edited candidate_id={candidate.id} in poll_id={candidate.poll.id}",
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+
+                messages.success(request, 'Candidate updated successfully!')
+                return redirect('poll_details', poll_id=candidate.poll.id)
+            else:
+                messages.error(request, 'Incorrect password')
+    else:
+        password_form = PasswordVerificationForm()
+        candidate_form = CandidateEditForm(instance=candidate)
+
+    return render(request, 'accounts/edit_candidate.html', {
+        'candidate': candidate,
+        'candidate_form': candidate_form,
+        'password_form': password_form,
+    })
+def delete_poll(request, poll_id):
+    if not request.session.get('admin_id'):
+        return redirect('admin_login')
+
+    poll = get_object_or_404(Poll, id=poll_id)
+    admin = get_object_or_404(Admin, id=request.session['admin_id'])
+
+    if request.method == 'POST':
+        form = PollDeleteForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data['confirm'] and check_password(form.cleaned_data['password'], admin.password):
+                # Log the action before deletion
+                AdminLog.objects.create(
+                    admin=admin,
+                    action='DELETE_POLL',
+                    details=f"Deleted poll_id={poll.id} ({poll.name})",
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+
+                poll.delete()
+                messages.success(request, 'Poll deleted successfully!')
+                return redirect('admin_dashboard')
+            else:
+                messages.error(request, 'Incorrect password or confirmation')
+    else:
+        form = PollDeleteForm()
+
+    return render(request, 'accounts/delete_poll.html', {
+        'poll': poll,
+        'form': form,
     })

@@ -1,110 +1,191 @@
 {% extends 'accounts/base.html' %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-        <h1 class="h2">Create New Poll</h1>
-        <div class="btn-toolbar mb-2 mb-md-0">
-            <a href="{% url 'admin_dashboard' %}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Back to Dashboard
-            </a>
-        </div>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Create New Poll</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'admin_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
     </div>
+</div>
 
-    <div class="card">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
+<div class="card">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
 
-                <div class="row mb-3">
-                    <label for="{{ form.name.id_for_label }}" class="col-sm-2 col-form-label">Poll Name</label>
-                    <div class="col-sm-10">
-                        {{ form.name }}
-                        {% if form.name.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.name.errors|join:", " }}
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label for="{{ form.description.id_for_label }}" class="col-sm-2 col-form-label">Description</label>
-                    <div class="col-sm-10">
-                        {{ form.description }}
-                        <small class="text-muted">Optional description about the poll</small>
-                        {% if form.description.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.description.errors|join:", " }}
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label class="col-sm-2 col-form-label">Poll Dates</label>
-                    <div class="col-sm-5">
-                        <label for="{{ form.start_date.id_for_label }}" class="form-label">Start Date</label>
-                        {{ form.start_date }}
-                        {% if form.start_date.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.start_date.errors|join:", " }}
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="col-sm-5">
-                        <label for="{{ form.end_date.id_for_label }}" class="form-label">End Date</label>
-                        {{ form.end_date }}
-                        {% if form.end_date.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.end_date.errors|join:", " }}
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="row mb-3">
-                    <label for="{{ form.poll_type.id_for_label }}" class="col-sm-2 col-form-label">Poll Type</label>
-                    <div class="col-sm-10">
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="poll_type" id="poll_type_public"
-                                   value="public" {% if form.poll_type.value == 'public' %}checked{% endif %}>
-                            <label class="form-check-label" for="poll_type_public">Public</label>
+            <!-- Poll Name Field -->
+            <div class="row mb-3">
+                <label for="id_name" class="col-sm-2 col-form-label">Poll Name</label>
+                <div class="col-sm-10">
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.name.errors|join:", " }}
                         </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="poll_type" id="poll_type_private"
-                                   value="private" {% if form.poll_type.value == 'private' %}checked{% endif %}>
-                            <label class="form-check-label" for="poll_type_private">Private</label>
-                        </div>
-                        {% if form.poll_type.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ form.poll_type.errors|join:", " }}
-                            </div>
-                        {% endif %}
-                    </div>
+                    {% endif %}
                 </div>
+            </div>
 
-                <div class="row">
-                    <div class="col-sm-10 offset-sm-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Create Poll
-                        </button>
-                    </div>
+            <!-- Description Field -->
+            <div class="row mb-3">
+                <label for="id_description" class="col-sm-2 col-form-label">Description</label>
+                <div class="col-sm-10">
+                    {{ form.description }}
+                    <small class="text-muted">Optional description about the poll</small>
+                    {% if form.description.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.description.errors|join:", " }}
+                        </div>
+                    {% endif %}
                 </div>
-            </form>
+            </div>
+
+            <!-- Poll Dates -->
+            <div class="row mb-3">
+                <label class="col-sm-2 col-form-label">Poll Dates</label>
+                <div class="col-sm-5">
+                    <label for="id_start_date" class="form-label">Start Date</label>
+                    {{ form.start_date }}
+                    {% if form.start_date.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.start_date.errors|join:", " }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-sm-5">
+                    <label for="id_end_date" class="form-label">End Date</label>
+                    {{ form.end_date }}
+                    {% if form.end_date.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.end_date.errors|join:", " }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Poll Type -->
+            <div class="row mb-3">
+                <label class="col-sm-2 col-form-label">Poll Type</label>
+                <div class="col-sm-10">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="poll_type" id="poll_type_public"
+                               value="public" {% if form.poll_type.value == 'public' %}checked{% endif %}>
+                        <label class="form-check-label" for="poll_type_public">Public</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="poll_type" id="poll_type_private"
+                               value="private" {% if form.poll_type.value == 'private' %}checked{% endif %}>
+                        <label class="form-check-label" for="poll_type_private">Private</label>
+                    </div>
+                    {% if form.poll_type.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.poll_type.errors|join:", " }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Candidates Section -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <h5 class="border-bottom pb-2">Candidates</h5>
+                    <div id="candidates-container">
+                        <!-- First candidate (required) -->
+                        <div class="candidate-form mb-3 border p-3 rounded">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label for="candidate_name_0" class="form-label">Candidate Name *</label>
+                                    <input type="text" class="form-control" name="candidate_name" id="candidate_name_0" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="candidate_description_0" class="form-label">Description</label>
+                                    <input type="text" class="form-control" name="candidate_description" id="candidate_description_0">
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="candidate_image_0" class="form-label">Image</label>
+                                    <input type="file" class="form-control" name="candidate_image" id="candidate_image_0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" id="add-candidate" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-plus-circle"></i> Add Another Candidate
+                    </button>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-10 offset-sm-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Create Poll
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Template for new candidate forms (hidden) -->
+<div id="candidate-template" class="d-none">
+    <div class="candidate-form mb-3 border p-3 rounded">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Candidate Name *</label>
+                <input type="text" class="form-control" name="candidate_name" required>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Description</label>
+                <input type="text" class="form-control" name="candidate_description">
+            </div>
+            <div class="col-md-1">
+                <label class="form-label">Image</label>
+                <input type="file" class="form-control" name="candidate_image">
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button type="button" class="btn btn-danger remove-candidate">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Add Bootstrap Datepicker JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // Initialize datetime pickers
-    document.addEventListener('DOMContentLoaded', function() {
-        // You can add datetime picker initialization here if needed
-        // Example using flatpickr (would need to include the library):
-        // flatpickr("#id_start_date", {enableTime: true, dateFormat: "Y-m-d H:i"});
-        // flatpickr("#id_end_date", {enableTime: true, dateFormat: "Y-m-d H:i"});
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('candidates-container');
+    const addButton = document.getElementById('add-candidate');
+    const template = document.getElementById('candidate-template').firstElementChild;
+    let candidateCount = 1;
+
+    addButton.addEventListener('click', function() {
+        const newForm = template.cloneNode(true);
+        const inputs = newForm.querySelectorAll('input');
+        inputs.forEach(input => {
+            if (input.type !== 'file') {
+                input.value = '';
+                if (input.name === 'candidate_name' || input.name === 'candidate_description') {
+                    input.id = `${input.name}_${candidateCount}`;
+                    newForm.querySelector(`label[for="${input.name}_0"]`).htmlFor = `${input.name}_${candidateCount}`;
+                }
+            } else {
+                input.value = null;
+                input.id = `candidate_image_${candidateCount}`;
+                newForm.querySelector('label[for^="candidate_image"]').htmlFor = `candidate_image_${candidateCount}`;
+            }
+        });
+        container.appendChild(newForm);
+        candidateCount++;
     });
+
+    container.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-candidate')) {
+            if (container.children.length > 1) {
+                e.target.closest('.candidate-form').remove();
+            }
+        }
+    });
+});
 </script>
 {% endblock %}

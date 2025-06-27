@@ -1,0 +1,44 @@
+<!-- accounts/templates/accounts/vote_log.html -->
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Vote Log: {{ poll.name }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'poll_details' poll.id %}" class="btn btn-sm btn-outline-secondary">
+            Back to Poll
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if votes %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Voter</th>
+                        <th>Candidate</th>
+                        <th>Voted At</th>
+                        <th>IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vote in votes %}
+                    <tr>
+                        <td>{{ vote.voter.username|default:"Anonymous" }}</td>
+                        <td>{{ vote.candidate.name }}</td>
+                        <td>{{ vote.voted_at|date:"M d, Y H:i" }}</td>
+                        <td>{{ vote.ip_address|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">No votes recorded yet for this poll</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

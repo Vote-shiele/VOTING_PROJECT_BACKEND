@@ -1,0 +1,44 @@
+<!-- accounts/templates/accounts/delete_poll.html -->
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Delete Poll: {{ poll.name }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'poll_details' poll.id %}" class="btn btn-sm btn-outline-secondary">
+            Back to Poll
+        </a>
+    </div>
+</div>
+
+<div class="card border-danger">
+    <div class="card-header bg-danger text-white">
+        <strong>Warning!</strong> This action cannot be undone
+    </div>
+    <div class="card-body">
+        <p>Deleting this poll will permanently remove:</p>
+        <ul>
+            <li>The poll itself</li>
+            <li>All associated candidates ({{ poll.candidate_set.count }})</li>
+            <li>All voter data ({{ poll.voter_set.count }})</li>
+            <li>All voting records ({{ poll.votelog_set.count }})</li>
+        </ul>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+                {{ form.confirm.label_tag }}
+                {{ form.confirm }}
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Admin Password Verification</label>
+                {{ form.password }}
+                <small class="text-muted">Enter your admin password to confirm deletion</small>
+            </div>
+
+            <button type="submit" class="btn btn-danger">Confirm Deletion</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

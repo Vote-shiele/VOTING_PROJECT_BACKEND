@@ -15,9 +15,9 @@
         <h3>Ongoing Polls</h3>
         <div class="list-group">
             {% for poll in ongoing_polls %}
-            <a href="#" class="list-group-item list-group-item-action">
+            <a href="{% url 'poll_details' poll.id %}" class="list-group-item list-group-item-action">
                 {{ poll.name }} ({{ poll.poll_type|title }})
-                <span class="badge bg-primary rounded-pill">Ends: {{ poll.end_date|date:"M d, Y H:i" }}</span>
+                 <span class="badge bg-primary rounded-pill">Ends: {{ poll.end_date|date:"M d, Y H:i" }}</span>
             </a>
             {% empty %}
             <div class="alert alert-info">No ongoing polls</div>
@@ -29,9 +29,9 @@
         <h3>Completed Polls</h3>
         <div class="list-group">
             {% for poll in completed_polls %}
-            <a href="#" class="list-group-item list-group-item-action">
+            <a href="{% url 'poll_details' poll.id %}" class="list-group-item list-group-item-action">
                 {{ poll.name }} ({{ poll.poll_type|title }})
-                <span class="badge bg-secondary rounded-pill">Ended: {{ poll.end_date|date:"M d, Y H:i" }}</span>
+                 <span class="badge bg-primary rounded-pill">Ends: {{ poll.end_date|date:"M d, Y H:i" }}</span>
             </a>
             {% empty %}
             <div class="alert alert-info">No completed polls</div>

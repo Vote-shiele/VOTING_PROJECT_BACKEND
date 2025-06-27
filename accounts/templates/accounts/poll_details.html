@@ -1,0 +1,159 @@
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Poll: {{ poll.name }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'edit_poll' poll.id %}" class="btn btn-sm btn-outline-primary">Edit Poll</a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#shareModal">
+                Share
+            </button>
+            <a href="{% url 'vote_log' poll.id %}" class="btn btn-sm btn-outline-info">Vote Log</a>
+            <a href="{% url 'delete_poll' poll.id %}" class="btn btn-sm btn-outline-danger">Delete Poll</a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Poll Details
+                <span class="badge {% if poll.end_date > now %}bg-success{% else %}bg-secondary{% endif %}">
+                    {% if poll.end_date > now %}Active{% else %}Ended{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <p><strong>Type:</strong> {{ poll.get_poll_type_display }}</p>
+                <p><strong>Start Date:</strong> {{ poll.start_date|date:"M d, Y H:i" }}</p>
+                <p><strong>End Date:</strong> {{ poll.end_date|date:"M d, Y H:i" }}</p>
+                <p><strong>Description:</strong> {{ poll.description|default:"No description" }}</p>
+                <p><strong>Created By:</strong> {{ poll.admin.username }}</p>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                Quick Actions
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'add_candidate' poll.id %}" class="btn btn-primary">
+                        + Add New Candidate
+                    </a>
+                    <a href="{% url 'add_voter' poll.id %}" class="btn btn-secondary">
+                        + Add Voters
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                Candidates ({{ candidates.count }})
+                <span class="badge bg-primary rounded-pill">
+                    {{ candidates.count }}
+                </span>
+            </div>
+            <div class="card-body">
+                {% if candidates %}
+                    <div class="list-group">
+                        {% for candidate in candidates %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                {% if candidate.image %}
+                                    <img src="{{ candidate.image.url }}" class="rounded me-3" width="50" height="50">
+                                {% else %}
+                                    <div class="rounded me-3 bg-light d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                                        <i class="bi bi-person" style="font-size: 1.5rem;"></i>
+                                    </div>
+                                {% endif %}
+                                <div>
+                                    <h6 class="mb-1">{{ candidate.name }}</h6>
+                                    <small>{{ candidate.description|truncatechars:100 }}</small>
+                                </div>
+                            </div>
+                            <div>
+                                <a href="{% url 'edit_candidate' candidate.id %}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning text-center">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        No candidates added yet
+                        <div class="mt-2">
+                            <a href="{% url 'add_candidate' poll.id %}" class="btn btn-sm btn-primary">Add First Candidate</a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal fade" id="shareModal" tabindex="-1" aria-labelledby="shareModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="shareModalLabel">Share Poll</h5>
+                <button type="button" class="btn-close" data-bs-close="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if poll.poll_type == 'public' %}
+                    <div class="mb-3">
+                        <label class="form-label">Public Link</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="pollUrl"
+                                   value="{{ request.build_absolute_uri }}{% url 'poll_details' poll.id %}" readonly>
+                            <button class="btn btn-outline-secondary" onclick="copyToClipboard()">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+                        <p class="mt-2">Scan QR code to share</p>
+                    </div>
+                {% else %}
+                    <form method="post" action="{% url 'send_invitations' poll.id %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="emails" class="form-label">Enter email addresses (comma separated)</label>
+                            <textarea class="form-control" id="emails" name="emails" rows="3" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-envelope-fill"></i> Send Invitations
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToClipboard() {
+    const copyText = document.getElementById("pollUrl");
+    copyText.select();
+    copyText.setSelectionRange(0, 99999);
+    document.execCommand("copy");
+
+    // Show tooltip feedback
+    const tooltip = new bootstrap.Tooltip(copyText, {
+        title: "Copied!",
+        trigger: "manual"
+    });
+    tooltip.show();
+    setTimeout(() => tooltip.hide(), 1000);
+}
+</script>
+{% endblock %}

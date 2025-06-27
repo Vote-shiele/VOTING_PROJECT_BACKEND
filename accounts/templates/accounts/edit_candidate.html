@@ -1,0 +1,31 @@
+<!-- accounts/templates/accounts/edit_candidate.html -->
+{% extends 'accounts/base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Edit Candidate: {{ candidate.name }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{% url 'poll_details' candidate.poll.id %}" class="btn btn-sm btn-outline-secondary">
+            Back to Poll
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <h5>Candidate Details</h5>
+            {{ candidate_form.as_p }}
+
+            <h5 class="mt-4">Admin Verification</h5>
+            <div class="alert alert-warning">
+                You must verify your admin password to make changes
+            </div>
+            {{ password_form.as_p }}
+
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

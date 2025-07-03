@@ -4,7 +4,7 @@ from .forms import AdminSignUpForm, AdminLoginForm, PollEditForm, PasswordVerifi
 from .models import Admin, AdminLog
 from django.contrib.auth.hashers import check_password
 from django.utils import timezone
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.db.models import Q
@@ -343,4 +343,52 @@ def delete_poll(request, poll_id):
     return render(request, 'accounts/delete_poll.html', {
         'poll': poll,
         'form': form,
+    })
+
+
+from django.views.decorators.http import require_GET, require_POST
+
+
+@require_GET
+def voter_portal(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    candidates = poll.candidate_set.all()
+
+    # Verify voter access for private polls
+    if poll.poll_type == 'private' and not request.session.get(f'voter_{poll_id}'):
+        return HttpResponseForbidden("You must be invited to access this poll")
+
+    return render(request, 'voter_templates/vote_portal.html', {
+        'poll': poll,
+        'candidates': candidates,
+        'now': timezone.now()
+    })
+
+
+@require_POST
+def submit_vote(request):
+    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'error': 'Invalid request'}, status=400)
+
+    candidate_id = request.POST.get('candidate_id')
+    poll_id = request.POST.get('poll_id')
+
+    # Validate vote
+    candidate = get_object_or_404(Candidate, id=candidate_id, poll_id=poll_id)
+    poll = candidate.poll
+
+    # Check voting window
+    if not (poll.start_date <= timezone.now() <= poll.end_date):
+        return JsonResponse({'error': 'Voting period closed'}, status=403)
+
+    # Record vote (with IP for fraud detection)
+    VoteLog.objects.create(
+        candidate=candidate,
+        voter=request.user if request.user.is_authenticated else None,
+        ip_address=request.META.get('REMOTE_ADDR')
+    )
+
+    return JsonResponse({
+        'success': True,
+        'new_count': candidate.votelog_set.count()
     })

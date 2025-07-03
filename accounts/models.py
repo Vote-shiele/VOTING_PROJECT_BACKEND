@@ -76,6 +76,11 @@ class VoteLog(models.Model):
     voted_at = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['poll', 'voted_at']),  # Faster analytics
+        ]
+
     def __str__(self):
         voter_name = self.voter.username if self.voter else "Anonymous"
         return f"{voter_name} voted for {self.candidate.name} at {self.voted_at}"

@@ -1,0 +1,124 @@
+{% extends 'accounts/base_voter.html' %}
+
+{% block voting_content %}
+<div class="text-center mb-4">
+    <h1 class="display-4">{{ poll.name }}</h1>
+    <div class="time-remaining {% if poll.end_date < now %}text-danger{% else %}text-success{% endif %}">
+        {% if poll.end_date > now %}
+            ⏱️ {{ time_remaining }} remaining
+        {% else %}
+            🗳️ Voting closed
+        {% endif %}
+    </div>
+    <div class="total-votes my-3">
+        <span class="badge bg-primary">Total Votes: {{ total_votes }}</span>
+    </div>
+</div>
+
+<div class="row">
+    {% for candidate in candidates %}
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 voting-card">
+            {% if candidate.image %}
+            <img src="{{ candidate.image.url }}" class="card-img-top" alt="{{ candidate.name }}">
+            {% endif %}
+            <div class="card-body">
+                <h3 class="card-title">{{ candidate.name }}</h3>
+                <div class="card-text">
+                    {% if candidate.description %}
+                    <ul class="list-group list-group-flush mb-3">
+                        {% for point in candidate.description_points %}
+                        <li class="list-group-item">{{ point }}</li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer bg-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="badge bg-success vote-count" id="votes-{{ candidate.id }}">
+                        {{ candidate.vote_count }}
+                    </span>
+                    {% if poll.end_date > now %}
+                    <button class="btn btn-primary vote-btn" 
+                            data-candidate-id="{{ candidate.id }}"
+                            data-poll-id="{{ poll.id }}">
+                        Vote Now
+                    </button>
+                    {% else %}
+                    <button class="btn btn-secondary disabled">
+                        Voting Closed
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block voter_scripts %}
+<script>
+// Your real-time voting JavaScript here
+document.addEventListener('DOMContentLoaded', function() {
+    const pollId = "{{ poll.id }}";
+    const socket = new WebSocket(`ws://${window.location.host}/ws/votes/${pollId}/`);
+
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.type === 'vote_update') {
+            // Update UI with new vote counts
+            document.querySelector('.total-votes .badge').textContent = `Total Votes: ${data.total_votes}`;
+            for (const [candidateId, votes] of Object.entries(data.candidate_votes)) {
+                const element = document.getElementById(`votes-${candidateId}`);
+                if (element) {
+                    element.textContent = votes.count;
+                    element.classList.add('bg-warning');
+                    setTimeout(() => element.classList.remove('bg-warning'), 1000);
+                }
+            }
+        }
+    };
+
+    // Handle vote button clicks
+    document.querySelectorAll('.vote-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const candidateId = this.getAttribute('data-candidate-id');
+            const pollId = this.getAttribute('data-poll-id');
+            
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Voting...';
+            
+            fetch(`/poll/${pollId}/vote/${candidateId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    this.textContent = 'Voted!';
+                    this.classList.remove('btn-primary');
+                    this.classList.add('btn-success');
+                } else {
+                    this.textContent = 'Try Again';
+                    this.disabled = false;
+                    alert(data.message || 'Error voting');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                this.textContent = 'Error';
+                setTimeout(() => {
+                    this.textContent = 'Vote Now';
+                    this.disabled = false;
+                }, 2000);
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

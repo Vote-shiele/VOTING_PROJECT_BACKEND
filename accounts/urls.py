@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import cast_vote
 
 urlpatterns = [
     path('', views.signup_view, name='admin_signup'),
@@ -17,6 +18,6 @@ urlpatterns = [
     path('vote-log/<int:poll_id>/', views.vote_log, name='vote_log'),
     path('edit-candidate/<int:candidate_id>/', views.edit_candidate, name='edit_candidate'),
     path('delete-poll/<int:poll_id>/', views.delete_poll, name='delete_poll'),
-    path('vote/<int:poll_id>/', views.voter_portal, name='voter_portal'),
-    path('api/submit-vote/', views.submit_vote, name='submit_vote'),
+    path('poll/<int:poll_id>/vote/<int:candidate_id>/', cast_vote, name='cast_vote'),
+    path('poll/<int:poll_id>/portal/', views.voting_portal, name='voting_portal'),
 ]

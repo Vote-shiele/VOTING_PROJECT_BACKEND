@@ -4,7 +4,7 @@ from .forms import AdminSignUpForm, AdminLoginForm, PollEditForm, PasswordVerifi
 from .models import Admin, AdminLog
 from django.contrib.auth.hashers import check_password
 from django.utils import timezone
-from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
+from django.http import HttpResponse, JsonResponse
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.db.models import Q
@@ -19,6 +19,9 @@ from .forms import VoterForm
 from .models import Poll, Candidate
 from .forms import PollForm, CandidateForm
 from django.shortcuts import get_object_or_404
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
 
 def signup_view(request):
     if request.method == 'POST':
@@ -346,49 +349,106 @@ def delete_poll(request, poll_id):
     })
 
 
-from django.views.decorators.http import require_GET, require_POST
-
-
-@require_GET
-def voter_portal(request, poll_id):
+def voting_portal(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
-    candidates = poll.candidate_set.all()
+    candidates = Candidate.objects.filter(poll=poll).select_related('poll').prefetch_related('votelog_set')
 
-    # Verify voter access for private polls
-    if poll.poll_type == 'private' and not request.session.get(f'voter_{poll_id}'):
-        return HttpResponseForbidden("You must be invited to access this poll")
+    # Calculate time remaining
+    time_remaining = "Poll ended"
+    if poll.end_date > now():
+        delta = poll.end_date - now()
+        days = delta.days
+        hours, remainder = divmod(delta.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        time_remaining = f"{days}d {hours}h {minutes}m"
 
-    return render(request, 'voter_templates/vote_portal.html', {
+    # Prepare candidates data
+    candidates_data = []
+    total_votes = 0
+
+    for candidate in candidates:
+        vote_count = candidate.votelog_set.count()
+        total_votes += vote_count
+
+        candidates_data.append({
+            'id': candidate.id,
+            'name': candidate.name,
+            'description': candidate.description,
+            'description_points': candidate.description.split('\n') if candidate.description else [],
+            'vote_count': vote_count,
+            'image': candidate.image
+        })
+
+    # Determine which base template to use
+    if request.GET.get('admin'):  # Optional flag for admin view
+        base_template = 'accounts/base.html'
+    else:
+        base_template = 'accounts/base_voter.html'
+
+    return render(request, 'accounts/voting_portal.html', {
         'poll': poll,
-        'candidates': candidates,
-        'now': timezone.now()
+        'candidates': candidates_data,
+        'time_remaining': time_remaining,
+        'total_votes': total_votes,
+        'now': now(),
+        'base_template': base_template  # Pass to template if needed
     })
 
+def cast_vote(request, poll_id, candidate_id):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
 
-@require_POST
-def submit_vote(request):
-    if not request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'error': 'Invalid request'}, status=400)
+    poll = get_object_or_404(Poll, id=poll_id)
+    candidate = get_object_or_404(Candidate, id=candidate_id)
 
-    candidate_id = request.POST.get('candidate_id')
-    poll_id = request.POST.get('poll_id')
+    # Check if poll is still active
+    if poll.end_date < now():
+        return JsonResponse({'status': 'error', 'message': 'Voting period has ended'}, status=400)
 
-    # Validate vote
-    candidate = get_object_or_404(Candidate, id=candidate_id, poll_id=poll_id)
-    poll = candidate.poll
+    # Check if user already voted (if authenticated)
+    if request.user.is_authenticated:
+        if VoteLog.objects.filter(poll=poll, voter=request.user).exists():
+            return JsonResponse({'status': 'error', 'message': 'You have already voted'}, status=400)
 
-    # Check voting window
-    if not (poll.start_date <= timezone.now() <= poll.end_date):
-        return JsonResponse({'error': 'Voting period closed'}, status=403)
-
-    # Record vote (with IP for fraud detection)
+    # Create vote log
     VoteLog.objects.create(
-        candidate=candidate,
+        poll=poll,
         voter=request.user if request.user.is_authenticated else None,
+        candidate=candidate,
         ip_address=request.META.get('REMOTE_ADDR')
     )
 
+    # Get updated vote counts
+    votes = get_vote_counts(poll_id)
+    total_votes = VoteLog.objects.filter(poll=poll).count()
+
+    # Broadcast update to all connected clients
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f'votes_{poll_id}',
+        {
+            'type': 'vote_update',
+            'total_votes': total_votes,
+            'candidate_votes': votes
+        }
+    )
+
     return JsonResponse({
-        'success': True,
-        'new_count': candidate.votelog_set.count()
+        'status': 'success',
+        'total_votes': total_votes,
+        'candidate_votes': votes
     })
+
+
+def get_vote_counts(poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    candidates = Candidate.objects.filter(poll=poll)
+    votes = {}
+
+    for candidate in candidates:
+        votes[candidate.id] = {
+            'name': candidate.name,
+            'count': candidate.votelog_set.count()
+        }
+    print(f"Vote counts: {votes}")
+    return votes

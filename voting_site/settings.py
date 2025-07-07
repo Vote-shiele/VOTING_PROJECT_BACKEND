@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'accounts',
     'django_extensions',
+    'channels',
 ]
 
 MIDDLEWARE = [
@@ -120,11 +121,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'  # For production deployment
-STATICFILES_DIRS = [
-    BASE_DIR / 'accounts/static',  # For development static files
-]
-
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -158,6 +154,12 @@ EMAIL_HOST_USER = 'moriartylink@gmail.com' #your@gmail.com
 EMAIL_HOST_PASSWORD = 'password'  # your-app-password
 
 
-RATELIMIT = {
-    'submit_vote': '5/m',  # 5 votes per minute per IP
+ASGI_APPLICATION = 'voting_site.asgi.application'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [('127.0.0.1', 6379)],
+        },
+    },
 }

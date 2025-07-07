@@ -42,6 +42,13 @@ class Poll(models.Model):
     def __str__(self):
         return self.name
 
+    def get_total_votes(self):
+        return VoteLog.objects.filter(poll=self).count()
+
+    def get_candidate_votes(self):
+        candidates = self.candidate_set.all()
+        return {candidate.id: candidate.votelog_set.count() for candidate in candidates}
+
 class Candidate(models.Model):
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
@@ -75,11 +82,6 @@ class VoteLog(models.Model):
     candidate = models.ForeignKey(Candidate, on_delete=models.CASCADE)
     voted_at = models.DateTimeField(auto_now_add=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=['poll', 'voted_at']),  # Faster analytics
-        ]
 
     def __str__(self):
         voter_name = self.voter.username if self.voter else "Anonymous"

@@ -21,6 +21,9 @@ from .forms import PollForm, CandidateForm
 from django.shortcuts import get_object_or_404
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from io import BytesIO
+import segno
+from urllib.parse import urlencode
 
 
 def signup_view(request):
@@ -233,16 +236,25 @@ def search_polls(request):
         'completed_polls': completed_polls,
         'active_tab': 'search'
     })
+
+
 def poll_details(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
     candidates = Candidate.objects.filter(poll=poll)
-    qr_code = get_qr_code(request.build_absolute_uri(f'/poll-details/{poll.id}/'))
+
+    # Generate voting portal URL
+    base_url = request.build_absolute_uri('/').rstrip('/')
+    voting_url = f"{base_url}/poll/{poll.id}/portal/"
+
+    qr_code = get_qr_code(voting_url)
+
     return render(request, 'accounts/poll_details.html', {
         'poll': poll,
         'candidates': candidates,
         'qr_code': qr_code,
+        'voting_url': voting_url,
         'now': timezone.now()
-    }) #updated_Jun27_25
+    })
 def edit_poll(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
 
@@ -273,12 +285,21 @@ def vote_log(request, poll_id):
 
 #updated_Jun27_25
 def get_qr_code(url):
-    qr = qrcode.QRCode(version=1, box_size=10, border=5)
-    qr.add_data(url)
-    qr.make(fit=True)
-    img = qr.make_image(fill='black', back_color='white')
-    buffered = io.BytesIO()
-    img.save(buffered)
+    """Generate a modern QR code with logo space"""
+    buffered = BytesIO()
+
+    # Create QR with center logo space
+    qr = segno.make(url, error='h')
+    qr.save(
+        buffered,
+        scale=6,
+        kind='png',
+        dark='#2563eb',  # Nice blue color
+        light=None,  # Transparent background
+        border=1,
+        quiet_zone="#ffffff"  # White border
+    )
+
     return base64.b64encode(buffered.getvalue()).decode()
 def edit_candidate(request, candidate_id):
     if not request.session.get('admin_id'):

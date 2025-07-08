@@ -114,9 +114,93 @@
     </div>
 </div>
 
-<!-- Share Modal (Keep existing) -->
-<div class="modal fade" id="shareModal" tabindex="-1" aria-labelledby="shareModalLabel" aria-hidden="true">
-    <!-- ... existing modal content ... -->
+<!-- Share Modal -->
+<div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-body p-4 text-center">
+                <h5 class="mb-3">Share Voting Portal</h5>
+
+                <!-- QR Code -->
+                <div class="qr-container mb-3 mx-auto" style="width: 200px;">
+                    <img src="data:image/png;base64,{{ qr_code }}"
+                         class="img-fluid rounded-3 border border-3 border-primary"
+                         alt="Scan to vote">
+                    <div class="mt-2 text-muted small">Scan to vote</div>
+                </div>
+
+                <!-- Link Sharing -->
+                <div class="copy-section bg-light p-3 rounded-3">
+        <h6 class="text-center mb-3">Or copy link:</h6>
+        <div class="input-group">
+            <input type="text"
+                   class="form-control"
+                   id="pollUrl"
+                   value="{{ voting_url }}"
+                   readonly
+                   aria-label="Voting link">
+            <button class="btn btn-primary copy-btn"
+                    type="button"
+                    onclick="copyToClipboard()"
+                    data-bs-toggle="tooltip"
+                    data-bs-placement="top"
+                    title="Copy to clipboard">
+                <i class="bi bi-clipboard"></i>
+                <span class="ms-1 d-none d-sm-inline">Copy</span>
+            </button>
+        </div>
+        <div id="copyFeedback" class="text-center text-success small mt-2" style="display:none;">
+            <i class="bi bi-check-circle-fill"></i> Link copied!
+        </div>
+
+                <!-- Enhanced Social Sharing Section -->
+<div class="share-section mt-4">
+    <h6 class="text-center mb-3">Share via:</h6>
+
+    <div class="d-flex justify-content-center gap-3 mb-4">
+        <!-- WhatsApp -->
+        <a href="https://wa.me/?text=Join%20the%20vote:%20{{ voting_url|urlencode }}"
+           class="btn btn-success btn-share"
+           target="_blank"
+           data-bs-toggle="tooltip"
+           data-bs-placement="top"
+           title="Share on WhatsApp">
+            <i class="bi bi-whatsapp fs-5 me-2"></i>
+            WhatsApp
+        </a>
+
+        <!-- Email -->
+        <a href="mailto:?subject=Invitation%20to%20vote%20in%20{{ poll.name|urlencode }}&body=You%20are%20invited%20to%20vote:%20{{ voting_url|urlencode }}"
+           class="btn btn-danger btn-share"
+           data-bs-toggle="tooltip"
+           data-bs-placement="top"
+           title="Share via Email">
+            <i class="bi bi-envelope fs-5 me-2"></i>
+            Email
+        </a>
+
+        <!-- Twitter -->
+        <a href="https://twitter.com/intent/tweet?text=Join%20the%20vote:%20{{ voting_url|urlencode }}"
+           class="btn btn-info btn-share"
+           target="_blank"
+           data-bs-toggle="tooltip"
+           data-bs-placement="top"
+           title="Share on Twitter">
+            <i class="bi bi-twitter fs-5 me-2"></i>
+            Twitter
+        </a>
+    </div>
+
+
+
+    </div>
+</div>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -230,31 +314,63 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('WebSocket error:', e);
     };
 
-    // Keep existing clipboard function
-    function copyToClipboard() {
-        const copyText = document.getElementById("pollUrl");
-        copyText.select();
-        copyText.setSelectionRange(0, 99999);
-        document.execCommand("copy");
+    // Enhanced clipboard function with better feedback
+function copyToClipboard() {
+    const copyText = document.getElementById("pollUrl");
+    const feedback = document.getElementById("copyFeedback");
+    const copyBtn = document.querySelector('.copy-btn');
 
-        const tooltip = new bootstrap.Tooltip(copyText, {
-            title: "Copied!",
-            trigger: "manual"
+    // Modern Clipboard API approach
+    navigator.clipboard.writeText(copyText.value)
+        .then(() => {
+            // Success feedback
+            copyBtn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+            copyBtn.classList.remove('btn-primary');
+            copyBtn.classList.add('btn-success');
+
+            // Show feedback message
+            feedback.style.display = "block";
+
+            // Reset after 2 seconds
+            setTimeout(() => {
+                copyBtn.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-primary');
+                feedback.style.display = "none";
+            }, 2000);
+        })
+        .catch(err => {
+            console.error('Failed to copy: ', err);
+            // Fallback for older browsers
+            copyText.select();
+            document.execCommand("copy");
+
+            // Show feedback anyway
+            copyBtn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+            copyBtn.classList.remove('btn-primary');
+            copyBtn.classList.add('btn-success');
+            feedback.style.display = "block";
+
+            setTimeout(() => {
+                copyBtn.innerHTML = '<i class="bi bi-clipboard"></i> Copy';
+                copyBtn.classList.remove('btn-success');
+                copyBtn.classList.add('btn-primary');
+                feedback.style.display = "none";
+            }, 2000);
         });
-        tooltip.show();
-        setTimeout(() => tooltip.hide(), 1000);
-    }
+}
+
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
 });
 
 </script>
 
 <style>
-.chart-type-btn.active {
-    background-color: #4e73df;
-    color: white;
-}
-.chart-container {
-    min-height: 300px;
-}
+
 </style>
 {% endblock %}

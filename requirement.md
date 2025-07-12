@@ -2,6 +2,8 @@
 qrcode[pil]==7.4.2
 Pillow==10.0.0
 pyOpenSSL==23.2.0
+channels
+django-extensions
 
 # Email Support
 django-sendmail-backend==0.2.1

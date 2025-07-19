@@ -84,3 +84,23 @@ class PollDeleteForm(forms.Form):
         label="I confirm I want to delete this poll and all its data"
     )
     password = forms.CharField(widget=forms.PasswordInput)
+
+class VoterValidationForm(forms.Form):
+    username = forms.CharField(max_length=150)
+    email = forms.EmailField()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        username = cleaned_data.get("username")
+        email = cleaned_data.get("email")
+
+        if not Voter.objects.filter(username=username, email=email).exists():
+            raise forms.ValidationError("Voter not found or invalid credentials.")
+
+        voter = Voter.objects.filter(username=username, email=email).first()
+
+        if voter.has_voted:
+            raise forms.ValidationError("This voter has already voted.")
+
+        cleaned_data['voter'] = voter
+        return cleaned_data

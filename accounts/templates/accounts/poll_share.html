@@ -7,8 +7,12 @@
 
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title">Poll Link</h5>
+        <h5 class="card-title">Poll Link</h5>def voting_portal(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    candidates =
         <div class="input-group mb-3">
+            <a href="http://127.0.0.1:8001/poll/{{ poll.id }}/validate/">Share Voting Link</a>
+
             <input type="text" class="form-control" value="{{ poll_url }}" id="pollUrl" readonly>
             <button class="btn btn-outline-secondary" onclick="copyToClipboard()">Copy</button>
         </div>

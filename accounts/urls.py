@@ -19,5 +19,9 @@ urlpatterns = [
     path('edit-candidate/<int:candidate_id>/', views.edit_candidate, name='edit_candidate'),
     path('delete-poll/<int:poll_id>/', views.delete_poll, name='delete_poll'),
     path('poll/<int:poll_id>/vote/<int:candidate_id>/', cast_vote, name='cast_vote'),
-    path('poll/<int:poll_id>/portal/', views.voting_portal, name='voting_portal'),
+    #path('poll/<int:poll_id>/portal/', views.voting_portal, name='voting_portal'),
+    path('poll/<int:poll_id>/validate/', views.voter_validate, name='voter_validate'),
+    path('poll/<int:poll_id>/vote/', views.vote_portal, name='vote_portal'),
+    path('poll/<int:poll_id>/results/', views.results, name='results'),
+
 ]

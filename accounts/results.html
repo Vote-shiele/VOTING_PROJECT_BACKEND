@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Results for {{ poll.name }}</title>
+</head>
+<body>
+    <h2>Thank you, {{ voter.username }}! Your vote has been recorded.</h2>
+    <h3>Results for {{ poll.name }}</h3>
+    <p>Total Votes: {{ total_votes }}</p>
+    <ul>
+        {% for item in candidate_votes %}
+            <li>{{ item.candidate__name }}: {{ item.votes }} votes ({{ item.percentage }}%)</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

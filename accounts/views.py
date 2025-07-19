@@ -1,3 +1,4 @@
+from django.forms import forms
 from django.shortcuts import render, redirect
 from .forms import AdminSignUpForm, AdminLoginForm, PollEditForm, PasswordVerificationForm, CandidateEditForm, \
     PollDeleteForm
@@ -24,7 +25,10 @@ from asgiref.sync import async_to_sync
 from io import BytesIO
 import segno
 from urllib.parse import urlencode
-
+from django.shortcuts import render, redirect
+from .forms import VoterValidationForm
+from .models import Poll, Voter, Candidate, VoteLog
+from django.db.models import Count
 
 def signup_view(request):
     if request.method == 'POST':
@@ -155,7 +159,8 @@ def poll_created_view(request, poll_id):
 
     if poll.poll_type == 'public':
         # Generate QR code
-        poll_url = request.build_absolute_uri(f'/poll/{poll.id}/')
+        poll_url = request.build_absolute_uri(f'/poll/{poll.id}/validate/')
+
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
         qr.add_data(poll_url)
         qr.make(fit=True)
@@ -236,15 +241,13 @@ def search_polls(request):
         'completed_polls': completed_polls,
         'active_tab': 'search'
     })
-
-
 def poll_details(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
     candidates = Candidate.objects.filter(poll=poll)
 
     # Generate voting portal URL
     base_url = request.build_absolute_uri('/').rstrip('/')
-    voting_url = f"{base_url}/poll/{poll.id}/portal/"
+    voting_url = f"{base_url}/poll/{poll.id}/validate/"
 
     qr_code = get_qr_code(voting_url)
 
@@ -282,7 +285,6 @@ def vote_log(request, poll_id):
         'poll': poll,
         'votes': votes,
     })
-
 #updated_Jun27_25
 def get_qr_code(url):
     """Generate a modern QR code with logo space"""
@@ -368,53 +370,6 @@ def delete_poll(request, poll_id):
         'poll': poll,
         'form': form,
     })
-
-
-def voting_portal(request, poll_id):
-    poll = get_object_or_404(Poll, id=poll_id)
-    candidates = Candidate.objects.filter(poll=poll).select_related('poll').prefetch_related('votelog_set')
-
-    # Calculate time remaining
-    time_remaining = "Poll ended"
-    if poll.end_date > now():
-        delta = poll.end_date - now()
-        days = delta.days
-        hours, remainder = divmod(delta.seconds, 3600)
-        minutes, _ = divmod(remainder, 60)
-        time_remaining = f"{days}d {hours}h {minutes}m"
-
-    # Prepare candidates data
-    candidates_data = []
-    total_votes = 0
-
-    for candidate in candidates:
-        vote_count = candidate.votelog_set.count()
-        total_votes += vote_count
-
-        candidates_data.append({
-            'id': candidate.id,
-            'name': candidate.name,
-            'description': candidate.description,
-            'description_points': candidate.description.split('\n') if candidate.description else [],
-            'vote_count': vote_count,
-            'image': candidate.image
-        })
-
-    # Determine which base template to use
-    if request.GET.get('admin'):  # Optional flag for admin view
-        base_template = 'accounts/base.html'
-    else:
-        base_template = 'accounts/base_voter.html'
-
-    return render(request, 'accounts/voting_portal.html', {
-        'poll': poll,
-        'candidates': candidates_data,
-        'time_remaining': time_remaining,
-        'total_votes': total_votes,
-        'now': now(),
-        'base_template': base_template  # Pass to template if needed
-    })
-
 def cast_vote(request, poll_id, candidate_id):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
@@ -459,8 +414,6 @@ def cast_vote(request, poll_id, candidate_id):
         'total_votes': total_votes,
         'candidate_votes': votes
     })
-
-
 def get_vote_counts(poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
     candidates = Candidate.objects.filter(poll=poll)
@@ -473,3 +426,123 @@ def get_vote_counts(poll_id):
         }
     print(f"Vote counts: {votes}")
     return votes
+#Voter validation view
+def voter_validate(request, poll_id):
+    try:
+        poll = Poll.objects.get(id=poll_id)
+    except Poll.DoesNotExist:
+        return render(request, 'accounts/error.html', {'message': 'Invalid Poll'})
+
+    # 🔧 Temporary: Auto-create test user for development
+    if not Voter.objects.filter(username="johnsmith", email="johnsmith@gamil.com", poll=poll).exists():
+        Voter.objects.create(
+            username="johnsmith",
+            email="johnsmith@gamil.com",
+            password="test123",  # 🔐 Consider hashing or removing in prod
+            poll=poll,
+            has_voted=False
+        )
+
+    if request.method == 'POST':
+        form = VoterValidationForm(request.POST)
+        if form.is_valid():
+            # ✅ Use `.filter().first()` to avoid MultipleObjectsReturned
+            username = form.cleaned_data['username']
+            email = form.cleaned_data['email']
+            voter = Voter.objects.filter(username=username, email=email, poll=poll).first()
+
+            if not voter:
+                form.add_error(None, "Voter not found.")
+            else:
+                request.session['voter_id'] = voter.id
+                request.session['validated_poll_id'] = poll_id
+                return redirect(f'/poll/{poll_id}/vote/')
+    else:
+        form = VoterValidationForm()
+
+    return render(request, 'accounts/voter_validate.html', {
+        'form': form,
+        'poll_id': poll_id
+    })
+
+#Voting page
+def vote_portal(request, poll_id):
+    voter_id = request.session.get('voter_id')
+    validated_poll_id = request.session.get('validated_poll_id')
+
+    # ✅ If not validated, redirect to validation page
+    if not voter_id or str(validated_poll_id) != str(poll_id):
+        return redirect(f'/poll/{poll_id}/validate/')
+
+    voter = Voter.objects.get(id=voter_id)
+
+    # Optional double-check: voter matches poll
+    if str(voter.poll.id) != str(poll_id):
+        return redirect(f'/poll/{poll_id}/validate/')
+
+    poll = voter.poll
+    candidates = Candidate.objects.filter(poll=poll)
+
+    if request.method == 'POST':
+        candidate_id = request.POST.get('candidate_id')
+        selected = Candidate.objects.get(id=candidate_id)
+
+        # Save vote
+        VoteLog.objects.create(poll=poll, voter=voter, candidate=selected)
+        voter.has_voted = True
+        voter.save()
+
+        # Optional: clear session validation after voting
+        response = redirect(f'/poll/{poll_id}/results/')
+        # Allow redirect to results before wiping session
+        request.session['clear_validation'] = True
+        return response
+
+    return render(request, 'accounts/vote_portal.html', {'poll': poll, 'candidates': candidates})
+
+# Result view
+def results(request, poll_id):
+    voter_id = request.session.get('voter_id')
+    validated_poll_id = request.session.get('validated_poll_id')
+
+    if not voter_id or str(validated_poll_id) != str(poll_id):
+        return redirect(f'/poll/{poll_id}/validate/')
+
+    voter = Voter.objects.get(id=voter_id)
+    poll = voter.poll
+
+    total_votes = VoteLog.objects.filter(poll=poll).count()
+    candidate_votes = VoteLog.objects.filter(poll=poll).values('candidate__name').annotate(votes=Count('id'))
+
+    for item in candidate_votes:
+        item['percentage'] = round((item['votes'] / total_votes) * 100, 2) if total_votes > 0 else 0
+
+    # Only clear validation after successful view
+    if request.session.get('clear_validation'):
+        del request.session['validated_poll_id']
+        del request.session['clear_validation']
+
+
+    return render(request, 'accounts/results.html', {
+        'poll': poll,
+        'total_votes': total_votes,
+        'candidate_votes': candidate_votes,
+        'voter': voter,
+    })
+
+def clean(self):
+    cleaned_data = super().clean()
+    username = cleaned_data.get("username")
+    email = cleaned_data.get("email")
+
+    if not Voter.objects.filter(username=username, email=email).exists():
+        raise forms.ValidationError("Voter not found or invalid credentials.")
+
+    # ✅ Fix multiple objects error
+    voter = Voter.objects.filter(username=username, email=email).first()
+
+    if voter.has_voted:
+        raise forms.ValidationError("This voter has already voted.")
+
+    cleaned_data['voter'] = voter
+    return cleaned_data

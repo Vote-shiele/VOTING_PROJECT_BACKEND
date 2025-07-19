@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Voter Validation</title>
+</head>
+<body>
+    <h2>Voter Validation</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Validate and Continue</button>
+    </form>
+</body>
+</html>

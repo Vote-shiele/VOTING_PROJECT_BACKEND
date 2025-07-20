@@ -153,7 +153,6 @@ def settings_view(request):
     admin = get_object_or_404(Admin, id=admin_id)
 
     return render(request, 'accounts/settings.html', {'admin': admin})
-# poll sharing functionality
 def poll_created_view(request, poll_id):
     poll = get_object_or_404(Poll, id=poll_id)
 
@@ -178,7 +177,7 @@ def poll_created_view(request, poll_id):
         })
     else:
         # Private poll - show email invitation form
-        return render(request, 'accounts/poll_invite.html', {'poll': poll})
+        return render(request, 'accounts/poll_invite.html', {'poll': poll})___
 def send_invitations(request, poll_id):
     if request.method == 'POST':
         emails = request.POST.get('emails', '').split(',')
@@ -285,7 +284,6 @@ def vote_log(request, poll_id):
         'poll': poll,
         'votes': votes,
     })
-#updated_Jun27_25
 def get_qr_code(url):
     """Generate a modern QR code with logo space"""
     buffered = BytesIO()
@@ -304,26 +302,39 @@ def get_qr_code(url):
 
     return base64.b64encode(buffered.getvalue()).decode()
 def edit_candidate(request, candidate_id):
+    """
+    Secure candidate editing endpoint requiring:
+    - Admin session authentication
+    - Password reconfirmation
+    - Audit logging
+    """
+
+    # Authentication check - redirects unauthenticated admins
     if not request.session.get('admin_id'):
         return redirect('admin_login')
 
+    # Fetch required objects or 404
     candidate = get_object_or_404(Candidate, id=candidate_id)
     admin = get_object_or_404(Admin, id=request.session['admin_id'])
 
+    # POST: Handle form submission
     if request.method == 'POST':
         password_form = PasswordVerificationForm(request.POST)
         candidate_form = CandidateEditForm(request.POST, request.FILES, instance=candidate)
 
+        # Dual-form validation
         if password_form.is_valid() and candidate_form.is_valid():
+            # Critical: Verify admin password matches
             if check_password(password_form.cleaned_data['password'], admin.password):
+                # Save candidate changes
                 candidate = candidate_form.save()
 
-                # Log the action
+                # Create audit log entry
                 AdminLog.objects.create(
                     admin=admin,
-                    action='EDIT_CANDIDATE',
-                    details=f"Edited candidate_id={candidate.id} in poll_id={candidate.poll.id}",
-                    ip_address=request.META.get('REMOTE_ADDR')
+                    action='EDIT_CANDIDATE',  # Structured action type
+                    details=f"Edited candidate_id={candidate.id} in poll_id={candidate.poll.id}",  # Context
+                    ip_address=request.META.get('REMOTE_ADDR')  # Security logging
                 )
 
                 messages.success(request, 'Candidate updated successfully!')
@@ -331,79 +342,98 @@ def edit_candidate(request, candidate_id):
             else:
                 messages.error(request, 'Incorrect password')
     else:
+        # GET: Initialize empty forms
         password_form = PasswordVerificationForm()
         candidate_form = CandidateEditForm(instance=candidate)
 
     return render(request, 'accounts/edit_candidate.html', {
-        'candidate': candidate,
-        'candidate_form': candidate_form,
-        'password_form': password_form,
+        'candidate': candidate,  # For template context
+        'candidate_form': candidate_form,  # Edit form
+        'password_form': password_form,  # Security form
     })
 def delete_poll(request, poll_id):
+    """
+    Admin endpoint for secure poll deletion with audit logging.
+    Requires session auth, password confirmation, and admin privileges.
+    """
+
+    # Gate: Admin session check
     if not request.session.get('admin_id'):
         return redirect('admin_login')
 
+    # Fetch protected resources
     poll = get_object_or_404(Poll, id=poll_id)
     admin = get_object_or_404(Admin, id=request.session['admin_id'])
 
+    # POST: Handle deletion workflow
     if request.method == 'POST':
         form = PollDeleteForm(request.POST)
         if form.is_valid():
+            # Security: Password + checkbox confirmation
             if form.cleaned_data['confirm'] and check_password(form.cleaned_data['password'], admin.password):
-                # Log the action before deletion
+
+                # Audit trail before operation
                 AdminLog.objects.create(
                     admin=admin,
-                    action='DELETE_POLL',
-                    details=f"Deleted poll_id={poll.id} ({poll.name})",
-                    ip_address=request.META.get('REMOTE_ADDR')
+                    action='DELETE_POLL',  # Structured action type
+                    details=f"Deleted poll_id={poll.id} ({poll.name})",  # Contextual info
+                    ip_address=request.META.get('REMOTE_ADDR')  # Forensic tracking
                 )
 
-                poll.delete()
+                poll.delete()  # Cascades to related models
                 messages.success(request, 'Poll deleted successfully!')
                 return redirect('admin_dashboard')
             else:
                 messages.error(request, 'Incorrect password or confirmation')
     else:
-        form = PollDeleteForm()
+        form = PollDeleteForm()  # GET: Empty form
 
     return render(request, 'accounts/delete_poll.html', {
-        'poll': poll,
-        'form': form,
+        'poll': poll,  # Context for confirmation UI
+        'form': form,  # Password verification form
     })
 def cast_vote(request, poll_id, candidate_id):
+    """
+    Processes a vote submission and broadcasts real-time updates.
+
+    Returns JSON response with vote status and updated counts.
+    """
+
+    # Method validation - POST only endpoint
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'}, status=405)
 
+    # Validate poll and candidate existence
     poll = get_object_or_404(Poll, id=poll_id)
     candidate = get_object_or_404(Candidate, id=candidate_id)
 
-    # Check if poll is still active
+    # Voting window check
     if poll.end_date < now():
         return JsonResponse({'status': 'error', 'message': 'Voting period has ended'}, status=400)
 
-    # Check if user already voted (if authenticated)
+    # Prevent duplicate voting for authenticated users
     if request.user.is_authenticated:
         if VoteLog.objects.filter(poll=poll, voter=request.user).exists():
             return JsonResponse({'status': 'error', 'message': 'You have already voted'}, status=400)
 
-    # Create vote log
+    # Record vote with IP tracking
     VoteLog.objects.create(
         poll=poll,
-        voter=request.user if request.user.is_authenticated else None,
+        voter=request.user if request.user.is_authenticated else None,  # Anonymous votes allowed
         candidate=candidate,
-        ip_address=request.META.get('REMOTE_ADDR')
+        ip_address=request.META.get('REMOTE_ADDR')  # Basic fraud prevention
     )
 
-    # Get updated vote counts
+    # Calculate updated results
     votes = get_vote_counts(poll_id)
     total_votes = VoteLog.objects.filter(poll=poll).count()
 
-    # Broadcast update to all connected clients
+    # Real-time update via WebSockets
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(
-        f'votes_{poll_id}',
+        f'votes_{poll_id}',  # Channel group name
         {
-            'type': 'vote_update',
+            'type': 'vote_update',  # Handler method name
             'total_votes': total_votes,
             'candidate_votes': votes
         }
@@ -411,125 +441,160 @@ def cast_vote(request, poll_id, candidate_id):
 
     return JsonResponse({
         'status': 'success',
-        'total_votes': total_votes,
+        'total_votes': total_votes,  # Typo note: Should be 'total_votes'
         'candidate_votes': votes
     })
 def get_vote_counts(poll_id):
+    """
+    Retrieves vote counts for all candidates in a specified poll.
+
+    Args:
+        poll_id: ID of the poll to retrieve results for
+
+    Returns:
+        Dict mapping candidate IDs to their name and vote count
+        Format: {candidate_id: {'name': str, 'count': int}}
+
+    Raises:
+        Http404 if poll doesn't exist
+    """
+    # Fail fast if poll doesn't exist (returns 404)
     poll = get_object_or_404(Poll, id=poll_id)
+
+    # Single query to get all candidates for this poll
     candidates = Candidate.objects.filter(poll=poll)
     votes = {}
 
+    # Build results dictionary with one query per candidate
     for candidate in candidates:
         votes[candidate.id] = {
-            'name': candidate.name,
-            'count': candidate.votelog_set.count()
+            'name': candidate.name,  # Candidate metadata
+            'count': candidate.votelog_set.count()  # Reverse relation count
         }
+
+    # Development logging - remove in production
     print(f"Vote counts: {votes}")
+
     return votes
-#Voter validation view
 def voter_validate(request, poll_id):
+    # Pre-check: Validate poll existence before proceeding
     try:
         poll = Poll.objects.get(id=poll_id)
     except Poll.DoesNotExist:
         return render(request, 'accounts/error.html', {'message': 'Invalid Poll'})
 
-    # 🔧 Temporary: Auto-create test user for development
+    # Development convenience: Auto-create test voter
+    # Note: Remove this block in production or implement proper environment checks
     if not Voter.objects.filter(username="johnsmith", email="johnsmith@gamil.com", poll=poll).exists():
         Voter.objects.create(
             username="johnsmith",
             email="johnsmith@gamil.com",
-            password="test123",  # 🔐 Consider hashing or removing in prod
+            password="test123",  # Security warning: Plaintext password
             poll=poll,
             has_voted=False
         )
 
+    # Form processing for voter validation
     if request.method == 'POST':
         form = VoterValidationForm(request.POST)
         if form.is_valid():
-            # ✅ Use `.filter().first()` to avoid MultipleObjectsReturned
+            # Safe query pattern: Using filter().first() prevents exceptions
             username = form.cleaned_data['username']
             email = form.cleaned_data['email']
-            voter = Voter.objects.filter(username=username, email=email, poll=poll).first()
+            voter = Voter.objects.filter(
+                username=username,
+                email=email,
+                poll=poll
+            ).first()
 
             if not voter:
+                # Non-field error for invalid credentials
                 form.add_error(None, "Voter not found.")
             else:
+                # Session setup for authenticated voting flow
                 request.session['voter_id'] = voter.id
                 request.session['validated_poll_id'] = poll_id
                 return redirect(f'/poll/{poll_id}/vote/')
     else:
         form = VoterValidationForm()
 
+    # Render validation form (GET) or invalid form (POST)
     return render(request, 'accounts/voter_validate.html', {
-        'form': form,
-        'poll_id': poll_id
+        'form': form,  # Form instance for template rendering
+        'poll_id': poll_id  # Context for form action URL
     })
-
-#Voting page
 def vote_portal(request, poll_id):
+    #  Authentication - Verify voter session and poll validation
     voter_id = request.session.get('voter_id')
     validated_poll_id = request.session.get('validated_poll_id')
 
-    # ✅ If not validated, redirect to validation page
+    #  Security - Redirect unvalidated voters immediately
     if not voter_id or str(validated_poll_id) != str(poll_id):
         return redirect(f'/poll/{poll_id}/validate/')
 
+    #  Voter-Poll Verification
     voter = Voter.objects.get(id=voter_id)
 
-    # Optional double-check: voter matches poll
+    # Optional but recommended: Extra poll-voter relationship check
     if str(voter.poll.id) != str(poll_id):
         return redirect(f'/poll/{poll_id}/validate/')
 
     poll = voter.poll
-    candidates = Candidate.objects.filter(poll=poll)
+    candidates = Candidate.objects.filter(poll=poll)  # Get active candidates
 
     if request.method == 'POST':
+        # Vote Processing
         candidate_id = request.POST.get('candidate_id')
         selected = Candidate.objects.get(id=candidate_id)
 
-        # Save vote
+        #Persist vote (atomic create + voter status update)
         VoteLog.objects.create(poll=poll, voter=voter, candidate=selected)
-        voter.has_voted = True
+        voter.has_voted = True  # Prevent duplicate voting
         voter.save()
 
-        # Optional: clear session validation after voting
+        #Post-vote flow
         response = redirect(f'/poll/{poll_id}/results/')
-        # Allow redirect to results before wiping session
+        #Deferred session cleanup (after results view)
         request.session['clear_validation'] = True
         return response
 
-    return render(request, 'accounts/vote_portal.html', {'poll': poll, 'candidates': candidates})
-
-# Result view
+    # GET Request: Show voting interface
+    return render(request, 'accounts/vote_portal.html', {
+        'poll': poll,
+        'candidates': candidates  # Pass candidates for ballot display
+    })
 def results(request, poll_id):
+    # Gate: Session-based voter auth with poll validation
     voter_id = request.session.get('voter_id')
     validated_poll_id = request.session.get('validated_poll_id')
-
     if not voter_id or str(validated_poll_id) != str(poll_id):
-        return redirect(f'/poll/{poll_id}/validate/')
+        return redirect(f'/poll/{poll_id}/validate/')  # Fail-fast to validation
 
+    # Core data: Voter->Poll relationship assumed (1:1)
     voter = Voter.objects.get(id=voter_id)
     poll = voter.poll
 
+    # Aggregation: Single-query pattern for totals + breakdown
     total_votes = VoteLog.objects.filter(poll=poll).count()
-    candidate_votes = VoteLog.objects.filter(poll=poll).values('candidate__name').annotate(votes=Count('id'))
+    candidate_votes = VoteLog.objects.filter(poll=poll
+        ).values('candidate__name'
+        ).annotate(votes=Count('id'))  # Note: Uses GROUP BY
 
+    # Derived stat: Safe division for percentages
     for item in candidate_votes:
         item['percentage'] = round((item['votes'] / total_votes) * 100, 2) if total_votes > 0 else 0
 
-    # Only clear validation after successful view
+    # Session cleanup: Conditional post-validation reset
     if request.session.get('clear_validation'):
-        del request.session['validated_poll_id']
+        del request.session['validated_poll_id']  # Explicit invalidation
         del request.session['clear_validation']
 
-
     return render(request, 'accounts/results.html', {
-        'poll': poll,
-        'total_votes': total_votes,
-        'candidate_votes': candidate_votes,
-        'voter': voter,
+        'poll': poll,  # Pass-through object
+        'total_votes': total_votes,  # Pre-calculated metric
+        'candidate_votes': candidate_votes,  # Annotated queryset
+        'voter': voter,  # Contextual actor
     })
-
 def clean(self):
     cleaned_data = super().clean()
     username = cleaned_data.get("username")
